@@ -17,7 +17,7 @@ from .subagents.hotels_finder.agent import hotels_agent
 
 
 # --------------------------------------------------
-# 0. Helper nodes (plain Python functions)
+#  Helper nodes 
 # --------------------------------------------------
 
 def save_question(node_input: str) -> Event:
@@ -33,9 +33,6 @@ class RouterDecision(BaseModel):
     travel_request: str = Field(description="ONLY the travel-planning part of the message, as a complete standalone request. Empty string if none.")
     skipped_request: str = Field(description="A brief, neutral description (max 15 words) of any non-travel part left out, e.g. 'a coding question'. Empty string if none.")
     direct_response: str = Field(description="Polite refusal message if the message is not travel related. Empty string otherwise.")
-
-    # Facts extracted for validation. The router only reports them; Python decides (see tools/validation.py).
-    # No defaults on purpose: every field is required, so use "" / false / [] / 0 when unknown.
     origin: str = Field(description="Starting city or station as the user wrote it. Empty string if not given.")
     destination: str = Field(description="Destination city or station as the user wrote it. Empty string if not given.")
     start_date: str = Field(description="Departure date as YYYY-MM-DD. Empty string if not given.")
@@ -51,23 +48,21 @@ def conditional_gateway(node_input):
 
     This is a generator (it yields), so it has no '-> Event' return annotation.
     """
-    # The input may arrive as a RouterDecision, a dict or a JSON string, depending on the ADK version.
+    
     if isinstance(node_input, dict):
         node_input = RouterDecision(**node_input)
     elif isinstance(node_input, str):
         node_input = RouterDecision.model_validate_json(node_input)
 
-    # Travel request with real content: continue to the specialists
     if node_input is not None and node_input.is_travel_related and node_input.travel_request.strip():
         request = node_input.travel_request.strip()
 
-        # Sanity checks (past dates, impossible timing, silly activities) BEFORE any specialist runs
         problem = validate_trip(node_input, date.today())
         if problem:
             yield Event(route="early_exit", output=f"I can't plan this trip yet. {problem}")
             return
 
-        # Tell the user right away if part of their message was left out
+      
         if node_input.skipped_request.strip():
             yield Event(
                 message=f"Note: I can only help with travel planning, so I skipped: {node_input.skipped_request.strip()}"
@@ -80,7 +75,7 @@ def conditional_gateway(node_input):
         )
         return
 
-    # Off-topic (or empty travel request): skip the specialists and return the polite refusal
+   
     refusal = (
         node_input.direct_response
         if node_input is not None and node_input.direct_response
@@ -95,12 +90,11 @@ def start_search(node_input) -> Event:
 
 
 def early_exit_response(node_input: str):
-    yield Event(message=node_input)   # shown to the user as a chat bubble
-    yield Event(output=node_input)    # passed on as the node's result
-
+    yield Event(message=node_input)  
+    yield Event(output=node_input)    
 
 # --------------------------------------------------
-# 1. Orchestrator / Topic Router
+#  Orchestrator / Topic Router
 # --------------------------------------------------
 
 orchestrator = Agent(
@@ -156,7 +150,7 @@ orchestrator = Agent(
 
 
 # --------------------------------------------------
-# 2. Final Itinerary Builder
+#  Final Itinerary Builder
 # --------------------------------------------------
 
 itinerary_builder = Agent(
@@ -211,38 +205,29 @@ itinerary_builder = Agent(
 
 
 # --------------------------------------------------
-# 3. Join Node
+#  Join Node
 # --------------------------------------------------
 
 join_inputs = JoinNode(name="join_travel_results")
 
 
 # --------------------------------------------------
-# 4. Workflow graph
+#  Workflow graph
 # --------------------------------------------------
 
 root_agent = Workflow(
     name="travel_planning_workflow",
-    edges=[
-        # Save the question, then let the orchestrator classify it
-        (START, save_question, orchestrator),
-
-        # The orchestrator's decision goes into the routing function
+    edges=[ (START, save_question, orchestrator),
         (orchestrator, conditional_gateway),
-
-        # Route 1: travel request -> start the search
         (conditional_gateway, {
             "search_travel": start_search,
-            "early_exit": early_exit_response,   # Route 2: off-topic -> refusal, workflow ends
+            "early_exit": early_exit_response,  
         }),
 
-        # Fan-out: one edge per specialist (they run in parallel)
         (start_search, trains_agent, join_inputs),
         (start_search, hotels_agent, join_inputs),
         (start_search, activities_agent, join_inputs),
 
-        # Fan-in: wait for all three, then build the itinerary.
-        # No END edge: a node with no outgoing edge finishes the workflow.
         (join_inputs, itinerary_builder),
     ],
 )
