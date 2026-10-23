@@ -1,5 +1,4 @@
 
-
 import json
 from datetime import date, timedelta
 from types import SimpleNamespace
