@@ -1,0 +1,12 @@
+.env
+.venv/
+.check/
+__pycache__/
+*.pyc
+.pytest_cache/
+.adk/
+uv.lock
+.python-version
+pyproject.toml
+travel_agent_tmp*/
+.git/
