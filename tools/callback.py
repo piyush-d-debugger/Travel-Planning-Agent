@@ -1,11 +1,4 @@
-"""
-Callbacks for the travel workflow (put this file at travel_agent/tools/callback.py).
 
-Part 1: quota-error handlers, one per role (router / specialists / builder)
-Part 2: prompt-injection guardrails (input, tool results, output)
-
-Callback signatures follow the ADK docs; check them against your installed version.
-"""
 
 import json
 import logging
@@ -24,7 +17,7 @@ logger = logging.getLogger(__name__)
 # --------------------------------------------------
 
 def _text_response(text: str) -> LlmResponse:
-    # LlmResponse holds a Content object, not a bare text field.
+  
     return LlmResponse(content=types.Content(role="model", parts=[types.Part(text=text)]))
 
 
@@ -42,12 +35,12 @@ def _last_user_text(llm_request: LlmRequest) -> str:
 
 
 # --------------------------------------------------
-# Part 1: quota-error handlers (on_model_error_callback)
+#  quota-error handlers (on_model_error_callback)
 # --------------------------------------------------
 
 def _is_quota_error(error: Exception) -> bool:
     """True for HTTP 429 / quota exhaustion errors."""
-    # google-genai API errors carry a numeric .code; fall back to the message text.
+   
     return getattr(error, "code", None) == 429 or "RESOURCE_EXHAUSTED" in str(error)
 
 
@@ -60,7 +53,7 @@ def make_quota_handler(fallback_text: str):
         error: Exception,
     ) -> LlmResponse | None:
         if not _is_quota_error(error):
-            return None  # any other error: let the framework handle it
+            return None  
 
         agent_name = getattr(callback_context, "agent_name", "unknown agent")
         logger.warning("Quota exhausted in %s: %s", agent_name, error)
@@ -69,8 +62,6 @@ def make_quota_handler(fallback_text: str):
     return handler
 
 
-# Specialists: this text lands in train_options / hotel_options / activity_options
-# and is read by the itinerary builder, so it is written for the builder, not the user.
 SPECIALIST_FALLBACK = (
     "NO RESULTS: the live search service was unavailable (quota exceeded), "
     "so no options could be fetched. Do not invent any."
@@ -98,13 +89,12 @@ def router_json(direct_response: str) -> str:
     })
 
 
-# Router: has output_schema, so the fallback MUST be JSON in the RouterDecision shape.
 ROUTER_FALLBACK = router_json(
     "Due to high traffic, I cannot process your request right now. "
     "Please try again in a few minutes."
 )
 
-# Builder: its text is shown to the user as the final answer.
+
 BUILDER_FALLBACK = (
     "Due to high traffic, I cannot build your itinerary right now. "
     "Please try again in a few minutes."
@@ -114,16 +104,14 @@ handle_specialist_quota_error = make_quota_handler(SPECIALIST_FALLBACK)
 handle_router_quota_error = make_quota_handler(ROUTER_FALLBACK)
 handle_builder_quota_error = make_quota_handler(BUILDER_FALLBACK)
 
-# Keeps older "from .tools.callback import handle_quota_error" imports working.
+
 handle_quota_error = handle_builder_quota_error
 
 
 # --------------------------------------------------
-# Part 2: prompt-injection guardrails
+#  prompt-injection guardrails
 # --------------------------------------------------
 
-# Phrases that real travel requests almost never contain.
-# This list is a speed bump, not a wall: paraphrases will get past it.
 INJECTION_PATTERNS = [
     r"ignore (all |any |the )?(previous|prior|above|earlier) (instructions|rules|prompts?)",
     r"disregard .{0,40}(instructions|rules)",
