@@ -154,9 +154,9 @@ The itinerary builder may only use what the specialists returned. Missing prices
     │   └── callback.py            # quota handlers and prompt-injection guards        
     ├── tests/                     # deterministic unit tests (no API key needed)
     ├── docs/
-    ├── .env                       # local settings and secrets (never commit)
-    ├── pyproject.toml
-    └── uv.lock
+    ├── .env                       # local settings and secrets 
+    └── pyproject.toml
+    
 ```
 
 ## Tech stack
